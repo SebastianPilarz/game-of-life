@@ -8,9 +8,6 @@
 #include <memory>
 #include <string>
 
-constexpr auto PLAY_ICON = "media-playback-start-symbolic";
-constexpr auto PAUSE_ICON = "media-playback-pause-symbolic";
-
 static void activate_cb(GtkApplication *app, gpointer user_data);
 static int iterate_cb(gpointer user_data);
 static void grid_click_cb(GtkGestureClick *gesture, guint n_press, gdouble x,
@@ -18,6 +15,40 @@ static void grid_click_cb(GtkGestureClick *gesture, guint n_press, gdouble x,
 static void play_btn_cb(GtkButton *button, gpointer user_data);
 static void speed_slider_cb(GtkScale *scale, gpointer user_data);
 static void debounce_timeout_cb(gpointer user_data);
+static char *value_format_func(GtkScale *scale, gdouble value,
+                               gpointer user_data);
+
+constexpr auto PLAY_ICON = "media-playback-start-symbolic";
+constexpr auto PAUSE_ICON = "media-playback-pause-symbolic";
+constexpr auto APP_CSS = R"(
+window.background {
+  background-color: transparent;
+}
+
+.control-panel {
+  padding: 10px;
+}
+
+.background {
+  background-color: rgb(0, 12, 21);
+}
+
+.control-panel button {
+  color: rgb(150, 150, 150);
+}
+
+.control-panel scale highlight {
+  background-color: rgb(229, 145, 162);
+}
+
+.control-panel scale slider {
+  background-color: rgb(20, 38, 50);
+}
+
+.control-panel label {
+  color: rgb(150, 150, 150);
+}
+)";
 
 struct Data {
   AdwApplication *app = nullptr;
@@ -40,7 +71,6 @@ static char *value_format_func(GtkScale *scale, gdouble value,
 
 static void debounce_timeout_cb(gpointer user_data) {
   Data *data = (Data *)user_data;
-  // g_message("Released\n");
   data->slider_timeout_id = -1;
 
   g_source_remove(data->iterate_timeout_id);
@@ -75,7 +105,6 @@ static void grid_click_cb(GtkGestureClick *gesture, guint n_press, gdouble x,
       GGB_GRID(gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(gesture)));
   int xi, yi;
   ggb_grid_position_to_index(grid, x, y, &xi, &yi);
-  g_print("click at %d, %d\n", xi, yi);
   data->running = false;
   if (data->play_button) {
     gtk_button_set_icon_name(GTK_BUTTON(data->play_button), PLAY_ICON);
@@ -89,22 +118,22 @@ static int iterate_cb(gpointer user_data) {
   if (data->running) {
     data->game->iterate();
     if (data->iteration_count_label) {
-      std::string label =
-          "Iterations: " + std::to_string(data->game->get_iterations());
-      gtk_label_set_text(GTK_LABEL(data->iteration_count_label), label.c_str());
+      const std::string label = "Iterations: <b>" +
+                                std::to_string(data->game->get_iterations()) +
+                                "</b>";
+      gtk_label_set_markup(GTK_LABEL(data->iteration_count_label),
+                           label.c_str());
     }
-    // GgbGrid *grid = GGB_GRID(gtk_window_get_child(data->window));
-    auto *grid = data->grid;
     for (int i = 0; i < data->game->get_cols_num(); i++) {
       for (int j = 0; j < data->game->get_rows_num(); j++) {
         if (data->game->get_cell(i, j)) {
-          ggb_grid_set_at(grid, i, j, TRUE, FALSE);
+          ggb_grid_set_at(data->grid, i, j, TRUE, FALSE);
         } else {
-          ggb_grid_set_at(grid, i, j, FALSE, FALSE);
+          ggb_grid_set_at(data->grid, i, j, FALSE, FALSE);
         }
       }
     }
-    ggb_grid_redraw(grid);
+    ggb_grid_redraw(data->grid);
   }
   return G_SOURCE_CONTINUE;
 }
@@ -114,22 +143,19 @@ static void activate_cb(GtkApplication *app, gpointer user_data) {
   auto *data = (Data *)user_data;
   data->window = (GtkWindow *)gtk_application_window_new(app);
   gtk_window_set_title(GTK_WINDOW(data->window), "Game of Life");
-  gtk_window_set_default_size(GTK_WINDOW(data->window), 400, 500);
+  gtk_window_set_default_size(GTK_WINDOW(data->window), 400, 450);
   auto vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
   gtk_window_set_child(data->window, vbox);
 
   // grid
   data->game = std::make_unique<GameOfLife>(100, 100);
   data->grid = ggb_grid_new();
-  // gtk_widget_set_hexpand(GTK_WIDGET(data->grid), TRUE);
-  // gtk_widget_set_vexpand(GTK_WIDGET(data->grid), TRUE);
   gtk_widget_set_size_request(GTK_WIDGET(data->grid), 400, 400);
   ggb_grid_set_size(data->grid, data->game->get_cols_num(),
                     data->game->get_rows_num());
   ggb_grid_set_cell_spacing(data->grid, 0);
   ggb_grid_set_draw_guidelines(data->grid, FALSE);
   gtk_box_append(GTK_BOX(vbox), GTK_WIDGET(data->grid));
-  // gtk_window_set_child(data->window, GTK_WIDGET(data->grid));
 
   // grid click event
   auto *evk = gtk_gesture_click_new();
@@ -138,6 +164,10 @@ static void activate_cb(GtkApplication *app, gpointer user_data) {
 
   // control panel
   auto *hbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+  // const char *hbox_classes[] = {"linked", NULL};
+  const char *hbox_classes[] = {"control-panel", NULL};
+  gtk_widget_set_css_classes(hbox, hbox_classes);
+  // gtk_box_set_homogeneous(GTK_BOX(hbox), TRUE);
   gtk_box_append(GTK_BOX(vbox), hbox);
 
   // play button
@@ -159,6 +189,10 @@ static void activate_cb(GtkApplication *app, gpointer user_data) {
                    G_CALLBACK(speed_slider_cb), data);
   gtk_box_append(GTK_BOX(hbox), data->speed_slider);
 
+  // auto *filler = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+  // gtk_widget_set_hexpand(filler, TRUE);
+  // gtk_box_append(GTK_BOX(hbox), filler);
+
   // iteration counter
   data->iteration_count_label = gtk_label_new("");
   gtk_box_append(GTK_BOX(hbox), data->iteration_count_label);
@@ -171,7 +205,7 @@ static void activate_cb(GtkApplication *app, gpointer user_data) {
   // titlebar color
   const auto tweaker = gnt_macos_window_new(data->window);
   auto color = std::make_unique<GdkRGBA>();
-  gdk_rgba_parse(color.get(), "rgb(35, 0, 35)");
+  gdk_rgba_parse(color.get(), "rgb(0, 12, 21)");
   gnt_macos_window_set_titlebar_color(tweaker, color.get());
   g_object_unref(tweaker);
 }
@@ -187,8 +221,7 @@ int main() {
 
   // css
   auto *css_provider = gtk_css_provider_new();
-  gtk_css_provider_load_from_string(
-      css_provider, "window.background { background-color: transparent; }");
+  gtk_css_provider_load_from_string(css_provider, APP_CSS);
   gtk_style_context_add_provider_for_display(
       gdk_display_get_default(), GTK_STYLE_PROVIDER(css_provider),
       GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
