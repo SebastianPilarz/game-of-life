@@ -10,7 +10,8 @@ project(
 gnt_dep = dependency('gnt-0.1')
 ggb_dep = dependency('ggb-0.1')
 gtk_dep = dependency('gtk4')
-deps = [gtk_dep, gnt_dep, ggb_dep]
+adwaita_dep = dependency('libadwaita-1')
+deps = [gtk_dep, gnt_dep, ggb_dep, adwaita_dep]
 
 executable(
   'game-of-life',
