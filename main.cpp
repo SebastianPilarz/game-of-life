@@ -164,10 +164,8 @@ static void activate_cb(GtkApplication *app, gpointer user_data) {
 
   // control panel
   auto *hbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
-  // const char *hbox_classes[] = {"linked", NULL};
   const char *hbox_classes[] = {"control-panel", NULL};
   gtk_widget_set_css_classes(hbox, hbox_classes);
-  // gtk_box_set_homogeneous(GTK_BOX(hbox), TRUE);
   gtk_box_append(GTK_BOX(vbox), hbox);
 
   // play button
@@ -188,10 +186,6 @@ static void activate_cb(GtkApplication *app, gpointer user_data) {
   g_signal_connect(data->speed_slider, "value-changed",
                    G_CALLBACK(speed_slider_cb), data);
   gtk_box_append(GTK_BOX(hbox), data->speed_slider);
-
-  // auto *filler = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
-  // gtk_widget_set_hexpand(filler, TRUE);
-  // gtk_box_append(GTK_BOX(hbox), filler);
 
   // iteration counter
   data->iteration_count_label = gtk_label_new("");
