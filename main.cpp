@@ -1,3 +1,11 @@
+/*
+ * Copyright (C) 2024 Sebastian Pilarz
+ *
+ * This program is licensed under the GNU Affero General Public License.
+ * You should have received a copy of this license along with this program.
+ * If not, see <https://www.gnu.org/licenses/>.
+ */
+
 #include "game_of_life.h"
 #include "gtk/gtkcssprovider.h"
 #include <adwaita.h>
